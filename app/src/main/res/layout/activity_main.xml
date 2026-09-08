@@ -13,64 +13,45 @@
         android:layout_width="0dp"
         android:layout_height="50dp"
         android:background="@drawable/toptoolbar"
-        app:title="Tracking app 📍"
+        app:title="Your location 📍"
         app:titleCentered="true"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
     <!--
-        The guideline is the whole trick here. It's anchored 60% of the way
-        down from the top of the PARENT, not from the toolbar — so we
-        constrain the map's top to the toolbar's bottom, and its bottom to
-        this guideline, rather than trying to do percentage math ourselves.
+        osmdroid's MapView is a plain View, not a Fragment — simpler to
+        declare directly in XML, no FragmentManager transaction needed.
     -->
-    <androidx.constraintlayout.widget.Guideline
-        android:id="@+id/guideline_60"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        app:layout_constraintGuide_percent="0.60328317" />
-
-    <!--
-        SupportMapFragment declared via <fragment> tag. If you'd rather add it
-        programmatically (recommended if you ever need to swap map providers
-        later), replace this with a plain FrameLayout container and call
-        getSupportFragmentManager().beginTransaction().replace(...) in code.
-    -->
-    <fragment
-        android:id="@+id/map_fragment"
-        android:name="com.google.android.gms.maps.SupportMapFragment"
+    <org.osmdroid.views.MapView
+        android:id="@+id/map_view"
         android:layout_width="0dp"
         android:layout_height="0dp"
         app:layout_constraintTop_toBottomOf="@id/toolbar"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/guideline_60" />
+        app:layout_constraintBottom_toTopOf="@id/stats_panel" />
 
     <!--
-        Stats panel fills everything below the guideline down to the stop
-        button. Using a simple LinearLayout INSIDE this constrained region is
-        fine — weights are only a problem when they're doing the heavy
-        top-level split, not for arranging a few TextViews within a fixed box.
+        Stats panel fills everything below the map down to the bottom.
     -->
     <LinearLayout
         android:id="@+id/stats_panel"
         android:layout_width="0dp"
-        android:layout_height="0dp"
+        android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="16dp"
+        android:background="#D5FFFF"
         android:gravity="center"
-        app:layout_constraintTop_toBottomOf="@id/guideline_60"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toBottomOf="parent">
 
         <include
             android:id="@+id/included_layout_id"
-            layout="@drawable/panel_state"
+            layout="@layout/panel_state"
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
-            </LinearLayout>
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
