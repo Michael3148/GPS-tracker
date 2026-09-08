@@ -11,9 +11,9 @@
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="0dp"
-        android:layout_height="?attr/actionBarSize"
+        android:layout_height="50dp"
         android:background="@drawable/toptoolbar"
-        app:title="Tail Tracker 📍"
+        app:title="Tracking app 📍"
         app:titleCentered="true"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
