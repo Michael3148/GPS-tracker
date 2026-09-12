@@ -44,4 +44,5 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("org.osmdroid:osmdroid-android:6.1.20")
     implementation("androidx.work:work-runtime:2.9.1")
+    implementation("androidx.lifecycle:lifecycle-livedata:2.8.4")
 }

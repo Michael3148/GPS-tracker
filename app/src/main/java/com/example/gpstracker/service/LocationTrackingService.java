@@ -10,11 +10,13 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Location;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.os.SystemClock;
+import android.text.Html;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
@@ -28,10 +30,35 @@ import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.Priority;
 import com.example.gpstracker.model.TrackPoint;
+import com.example.gpstracker.TrackingRepository;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * The service that actually keeps GPS alive while the app is backgrounded,
+ * Doze kicks in, or the user swipes the app out of Recents.
+ *
+ * Three separate survival problems are handled here, and they are NOT the
+ * same problem even though tutorials often conflate them:
+ *
+ *   1. Stock Android Doze / App Standby  -> solved by being a proper
+ *      foreground service with a visible notification (Doze mostly leaves
+ *      FGS alone, that's the whole point of the API).
+ *
+ *   2. The user (or the system under memory pressure) swipes the app away
+ *      from Recents -> onTaskRemoved() fires, and on MANY OEM skins
+ *      (including Samsung One UI on budget devices like the A07) this is
+ *      treated as "the user wants this dead" and the process is killed
+ *      outright, foreground service or not. We fight this with a short
+ *      self-rescheduling alarm.
+ *
+ *   3. OEM battery managers (One UI's "Sleeping apps" / "Deep sleeping
+ *      apps", MIUI's battery saver, etc.) which sit ABOVE stock Android and
+ *      kill or freeze processes based on vendor heuristics Google doesn't
+ *      control. No code-only trick reliably solves this — it requires the
+ *      user to allow-list the app, which is Layer 3 (a later message).
+ */
 public class LocationTrackingService extends Service {
 
     private static final String TAG = "LocationTrackingSvc";
@@ -42,9 +69,12 @@ public class LocationTrackingService extends Service {
     private static final String CHANNEL_ID = "tracking_channel";
     private static final int NOTIFICATION_ID = 1001;
 
-    private static final long UPDATE_INTERVAL_MS = 5_000L;
-    private static final long MIN_UPDATE_INTERVAL_MS = 3_000L;
-    private static final long MAX_UPDATE_DELAY_MS = 15_000L;
+    // Battery-vs-accuracy tuning lives here, in one place, on purpose.
+    // These are the knobs you'll actually want to expose as user settings later
+    // (e.g. a "battery saver" toggle for long hikes).
+    private static final long UPDATE_INTERVAL_MS = 5_000L;       // desired cadence
+    private static final long MIN_UPDATE_INTERVAL_MS = 3_000L;   // fastest we'll accept
+    private static final long MAX_UPDATE_DELAY_MS = 15_000L;     // batching window (see below)
 
     private FusedLocationProviderClient fusedLocationClient;
     private LocationCallback locationCallback;
@@ -68,9 +98,20 @@ public class LocationTrackingService extends Service {
             return START_NOT_STICKY;
         }
 
-        startForeground(NOTIFICATION_ID, buildNotification("Tracking active"));
+        // Default / ACTION_START: (re)start tracking.
+        // startForeground() must be called within a few ms of the service
+        // starting on API 26+, so we do it unconditionally here before any
+        // other setup work, even if location updates fail to register.
+        startForeground(NOTIFICATION_ID, buildNotification());
+        TrackingRepository.getInstance().reset();
+        TrackingRepository.getInstance().isTracking.postValue(true);
         startLocationUpdates();
 
+        // START_STICKY: if the system kills us purely for memory (not an
+        // explicit user swipe-away), recreate the service with a null intent
+        // and let onStartCommand's default branch above restart tracking.
+        // This does NOT protect against onTaskRemoved-triggered kills on
+        // aggressive OEMs — that's handled separately below.
         return START_STICKY;
     }
 
@@ -126,8 +167,8 @@ public class LocationTrackingService extends Service {
                                 location.getTime()
                         );
                         sessionPoints.add(point);
+                        TrackingRepository.getInstance().addPoint(point);
                         Log.d(TAG, "Recorded point: " + point);
-                        // Layer 4 will replace this with a Room DAO insert.
                     }
                 } finally {
                     releaseShortWakeLock();
@@ -146,7 +187,7 @@ public class LocationTrackingService extends Service {
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
         if (pm == null) return;
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GpsTracker:pointWriteLock");
-        wakeLock.acquire(10_000L);
+        wakeLock.acquire(10_000L); // safety timeout so a bug can never hold it forever
     }
 
     private void releaseShortWakeLock() {
@@ -160,15 +201,27 @@ public class LocationTrackingService extends Service {
             fusedLocationClient.removeLocationUpdates(locationCallback);
         }
         locationCallback = null;
+        TrackingRepository.getInstance().isTracking.postValue(false);
         stopForeground(STOP_FOREGROUND_REMOVE);
         stopSelf();
     }
 
+    /**
+     * Fires when the app is swiped away from Recents. On stock Android this
+     * is harmless for a foreground service. On aggressive OEM skins it is
+     * often the actual kill trigger. We schedule a tiny exact alarm a few
+     * seconds out to relaunch ourselves — cheap, and gives the process a
+     * fighting chance of surviving the OEM's kill sweep.
+     *
+     * This is a mitigation, not a guarantee. Layer 3's OEM allow-listing is
+     * the real fix; this is a safety net underneath it.
+     */
     @Override
     public void onTaskRemoved(Intent rootIntent) {
         super.onTaskRemoved(rootIntent);
 
         if (locationCallback == null) {
+            // We weren't actively tracking, nothing to rescue.
             return;
         }
 
@@ -196,7 +249,7 @@ public class LocationTrackingService extends Service {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
                     "Location tracking",
-                    NotificationManager.IMPORTANCE_LOW
+                    NotificationManager.IMPORTANCE_LOW // LOW = no sound/heads-up, still visible
             );
             channel.setDescription("Shows when your route is being recorded");
             NotificationManager manager = getSystemService(NotificationManager.class);
@@ -206,25 +259,32 @@ public class LocationTrackingService extends Service {
         }
     }
 
-    private Notification buildNotification(String text) {
+    private Notification buildNotification() {
         Intent stopIntent = new Intent(this, LocationTrackingService.class);
         stopIntent.setAction(ACTION_STOP);
         PendingIntent stopPendingIntent = PendingIntent.getService(
                 this, 0, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
+        // Professional text with red accent and "working" dots
+        CharSequence contentTitle = Html.fromHtml("<font color='#D32F2F'><b>LIVE TRACKING</b></font>", Html.FROM_HTML_MODE_LEGACY);
+        String contentText = "Recording your route in real-time . . .";
+
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("GpsTracker")
-                .setContentText(text)
+                .setContentTitle(contentTitle)
+                .setContentText(contentText)
                 .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+                .setColor(Color.RED) // Tints the icon and app name red
+                .setColorized(true)
                 .setOngoing(true)
-                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", stopPendingIntent)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Tracking", stopPendingIntent)
                 .build();
     }
 
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
-        return null;
+        return null; // started service, not bound
     }
 }
