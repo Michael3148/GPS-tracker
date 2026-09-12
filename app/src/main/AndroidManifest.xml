@@ -17,11 +17,11 @@
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
+        android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:hardwareAccelerated="true"
         android:theme="@style/Theme.GPStracker">
         <activity
             android:name=".MainActivity"
@@ -39,6 +39,11 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="location" />
+
+        <activity
+            android:name=".details"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 
 </manifest>

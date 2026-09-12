@@ -196,13 +196,26 @@ public class MainActivity extends AppCompatActivity {
         });
 
         repo.isTracking.observe(this, tracking -> {
+            boolean wasTracking = isTracking;
             isTracking = Boolean.TRUE.equals(tracking);
             updateButtonAppearance();
+
             if (isTracking) {
                 sessionStartTimeMillis = System.currentTimeMillis();
                 timerHandler.post(timerRunnable);
             } else {
                 timerHandler.removeCallbacks(timerRunnable);
+                // If we were tracking ,and now we stopped, open the details activity
+                if (wasTracking) {
+                    long durationMillis = System.currentTimeMillis() - sessionStartTimeMillis;
+                    Double distanceMeters = repo.totalDistanceMeters.getValue();
+                    if (distanceMeters == null) distanceMeters = 0.0;
+
+                    Intent intent = new Intent(MainActivity.this, details.class);
+                    intent.putExtra("EXTRA_DISTANCE", distanceMeters);
+                    intent.putExtra("EXTRA_DURATION", durationMillis);
+                    startActivity(intent);
+                }
             }
         });
     }
