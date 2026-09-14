@@ -32,6 +32,18 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toTopOf="@id/stats_panel" />
 
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabRecenter"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:contentDescription="Recenter map"
+        app:srcCompat="@android:drawable/ic_menu_mylocation"
+        app:fabSize="mini"
+        app:backgroundTint="@color/white"
+        app:layout_constraintTop_toTopOf="@id/map_view"
+        app:layout_constraintEnd_toEndOf="@id/map_view" />
+
     <!--
         Stats panel fills everything below the map down to the bottom.
     -->

@@ -44,6 +44,13 @@ public class TrackingRepository {
         return instance;
     }
 
+    // Any implied speed above this between two consecutive fixes is treated
+    // as a GPS glitch, not real motion — generous enough to cover running or
+    // even casual cycling, but catches the "GPS teleport" artifacts common
+    // indoors/urban canyons. Raise this if you extend the app to cover
+    // driving.
+    private static final float MAX_PLAUSIBLE_SPEED_MPS = 15f; // ~54 km/h
+
     /** Called by LocationTrackingService every time a new fix arrives. */
     public void addPoint(TrackPoint point) {
         latestPoint.postValue(point);
@@ -55,13 +62,33 @@ public class TrackingRepository {
                     point.latitude, point.longitude,
                     results
             );
-            // Ignore sub-meter jumps — raw GPS jitter while standing still
-            // otherwise silently inflates the distance total over a long
-            // session, which is a very common bug in tutorial trackers.
-            if (results[0] > 1.0f) {
-                double current = totalDistanceMeters.getValue() == null ? 0 : totalDistanceMeters.getValue();
-                totalDistanceMeters.postValue(current + results[0]);
+            float distanceMeters = results[0];
+
+            // 1. Accuracy-aware threshold: a GPS fix's "accuracy" value is
+            // the radius (in meters) of the circle the real position is
+            // statistically likely to be within. If the reported movement
+            // is smaller than the combined uncertainty of both fixes, we
+            // genuinely cannot tell it apart from standing still — count
+            // it as noise, not distance.
+            float noiseFloor = previousPoint.accuracyMeters + point.accuracyMeters;
+
+            // 2. Speed sanity check: reject fixes implying an impossible
+            // speed, which is the signature of a GPS "jump" artifact rather
+            // than real motion.
+            long elapsedMillis = point.timestampMillis - previousPoint.timestampMillis;
+            boolean speedPlausible = true;
+            if (elapsedMillis > 0) {
+                float impliedSpeedMps = distanceMeters / (elapsedMillis / 1000f);
+                speedPlausible = impliedSpeedMps <= MAX_PLAUSIBLE_SPEED_MPS;
             }
+
+            if (distanceMeters > noiseFloor && speedPlausible) {
+                double current = totalDistanceMeters.getValue() == null ? 0 : totalDistanceMeters.getValue();
+                totalDistanceMeters.postValue(current + distanceMeters);
+            }
+            // else: silently discarded as noise/glitch. The map marker and
+            // latestPoint still update above, so the UI position still
+            // moves — only the distance TOTAL is protected from inflation.
         }
         previousPoint = point;
     }

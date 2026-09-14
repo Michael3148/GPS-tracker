@@ -31,6 +31,9 @@ import com.example.gpstracker.service.LocationTrackingService;
 import com.google.android.material.button.MaterialButton;
 
 import org.osmdroid.config.Configuration;
+import org.osmdroid.events.MapListener;
+import org.osmdroid.events.ScrollEvent;
+import org.osmdroid.events.ZoomEvent;
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.MapView;
@@ -41,6 +44,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
 public class MainActivity extends AppCompatActivity {
 
     private boolean doubleBackToExitPressedOnce = false;
@@ -50,11 +55,13 @@ public class MainActivity extends AppCompatActivity {
     private Marker currentLocationMarker;
 
     private MaterialButton buttonStartStop;
+    private FloatingActionButton fabRecenter;
     private TextView valueDistance;
     private TextView valueTime;
     private TextView valueSpeed;
 
     private boolean isTracking = false;
+    private boolean followMe = true;
     private long sessionStartTimeMillis = 0L;
     private final Handler timerHandler = new Handler(Looper.getMainLooper());
 
@@ -151,7 +158,20 @@ public class MainActivity extends AppCompatActivity {
 
         setupMap();
         setupStatViews();
+        setupRecenterFab();
         observeTrackingRepository();
+    }
+
+    private void setupRecenterFab() {
+        fabRecenter = findViewById(R.id.fabRecenter);
+        fabRecenter.setOnClickListener(v -> {
+            followMe = true;
+            // Immediately center to the latest known point if we have one
+            TrackPoint latest = TrackingRepository.getInstance().latestPoint.getValue();
+            if (latest != null) {
+                mapView.getController().animateTo(new GeoPoint(latest.latitude, latest.longitude));
+            }
+        });
     }
 
     // Get a free API key (no credit card needed): stadiamaps.com/signup
@@ -195,6 +215,22 @@ public class MainActivity extends AppCompatActivity {
         currentLocationMarker = new Marker(mapView);
         currentLocationMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER);
         mapView.getOverlays().add(currentLocationMarker);
+
+        // Detect manual map movement to stop following the user
+        mapView.addMapListener(new MapListener() {
+            @Override
+            public boolean onScroll(ScrollEvent event) {
+                // If the scroll is manual (user touch), stop following
+                if (event.getSource().isAnimating()) return false;
+                followMe = false;
+                return true;
+            }
+
+            @Override
+            public boolean onZoom(ZoomEvent event) {
+                return false;
+            }
+        });
     }
 
     private void setupStatViews() {
@@ -247,9 +283,13 @@ public class MainActivity extends AppCompatActivity {
         currentPoints.add(geoPoint);
         routeLine.setPoints(currentPoints);
 
-        // Move the "you are here" marker and recenter the camera
+        // Move the "you are here" marker
         currentLocationMarker.setPosition(geoPoint);
-        mapView.getController().animateTo(geoPoint);
+
+        // Only recenter the camera if "Follow Me" is active
+        if (followMe) {
+            mapView.getController().animateTo(geoPoint);
+        }
 
         // Speed comes straight from the GPS fix, convert m/s -> km/h
         float speedKmh = point.speedMetersPerSecond * 3.6f;
