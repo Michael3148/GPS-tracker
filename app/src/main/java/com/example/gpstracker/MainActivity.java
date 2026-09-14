@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -73,7 +74,7 @@ public class MainActivity extends AppCompatActivity {
     // ===== Permission launchers =====
     // These MUST be registered unconditionally in onCreate (not inside a
     // click handler) — ActivityResultLauncher requires registration before
-    // STARTED state ,or it throws at runtime. Each callback re-invokes
+    // STARTED state or it throws at runtime. Each callback re-invokes
     // attemptStartTracking(), which simply re-checks what's still missing
     // and asks for the next thing, or starts the service once nothing's
     // left to ask for.
@@ -153,9 +154,35 @@ public class MainActivity extends AppCompatActivity {
         observeTrackingRepository();
     }
 
+    // Get a free API key (no credit card needed): stadiamaps.com/signup
+    // Free tier: 200,000 tile requests/month, personal/non-commercial use.
+    private static final String STADIA_MAPS_API_KEY = "b635fde5-a56a-4dd8-8aa2-0d8f8b54282f";
+
     private void setupMap() {
         mapView = findViewById(R.id.map_view);
-        mapView.setTileSource(TileSourceFactory.MAPNIK);
+
+        // REPLACED TileSourceFactory.MAPNIK: that source points at
+        // tile.openstreetmap.org, OSM's own donated infrastructure, which
+        // explicitly forbids "distributing an app" that uses it without
+        // prior written permission — that's the exact policy that produced
+        // the "Access blocked" tiles you saw. Stadia Maps' free tier is
+        // built for real distributed apps like this one, no policy conflict.
+        org.osmdroid.tileprovider.tilesource.XYTileSource stadiaSource =
+                new org.osmdroid.tileprovider.tilesource.XYTileSource(
+                        "StadiaAlidadeSmooth",
+                        0, 20, 256,
+                        ".png?api_key=" + STADIA_MAPS_API_KEY,
+                        new String[]{"https://tiles.stadiamaps.com/tiles/alidade_smooth/"}
+                );
+        mapView.setTileSource(stadiaSource);
+
+        // Required by both Stadia Maps' and OpenStreetMap's terms: visible
+        // attribution on-screen whenever their tiles are displayed.
+        org.osmdroid.views.overlay.CopyrightOverlay copyrightOverlay =
+                new org.osmdroid.views.overlay.CopyrightOverlay(this);
+        copyrightOverlay.setCopyrightNotice("© Stadia Maps, © OpenMapTiles © OpenStreetMap contributors");
+        mapView.getOverlays().add(copyrightOverlay);
+
         mapView.setMultiTouchControls(true);
         mapView.getController().setZoom(17.0);
         // Reasonable default center (adjust freely) until the first real
@@ -196,26 +223,13 @@ public class MainActivity extends AppCompatActivity {
         });
 
         repo.isTracking.observe(this, tracking -> {
-            boolean wasTracking = isTracking;
             isTracking = Boolean.TRUE.equals(tracking);
             updateButtonAppearance();
-
             if (isTracking) {
                 sessionStartTimeMillis = System.currentTimeMillis();
                 timerHandler.post(timerRunnable);
             } else {
                 timerHandler.removeCallbacks(timerRunnable);
-                // If we were tracking ,and now we stopped, open the details activity
-                if (wasTracking) {
-                    long durationMillis = System.currentTimeMillis() - sessionStartTimeMillis;
-                    Double distanceMeters = repo.totalDistanceMeters.getValue();
-                    if (distanceMeters == null) distanceMeters = 0.0;
-
-                    Intent intent = new Intent(MainActivity.this, details.class);
-                    intent.putExtra("EXTRA_DISTANCE", distanceMeters);
-                    intent.putExtra("EXTRA_DURATION", durationMillis);
-                    startActivity(intent);
-                }
             }
         });
     }
@@ -246,10 +260,12 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateButtonAppearance() {
         if (isTracking) {
-            buttonStartStop.setText("STOP TRACKING");
+            buttonStartStop.setText("TRACKING . . .");
+            buttonStartStop.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(this, R.color.red)));
             buttonStartStop.setIconResource(android.R.drawable.ic_media_pause);
         } else {
             buttonStartStop.setText("START TRACKING");
+            buttonStartStop.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(this, R.color.blue)));
             buttonStartStop.setIconResource(android.R.drawable.ic_media_play);
         }
     }
