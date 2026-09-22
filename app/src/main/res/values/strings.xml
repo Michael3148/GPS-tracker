@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">GPS tracker</string>
+    <string name="recenter_location">Recenter to current location</string>
 </resources>

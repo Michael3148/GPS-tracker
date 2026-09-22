@@ -32,6 +32,20 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toTopOf="@id/stats_panel" />
 
+    <!-- Floating Action Button to center on current location -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_current_location"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:contentDescription="@string/recenter_location"
+        app:srcCompat="@android:drawable/ic_menu_mylocation"
+        app:backgroundTint="@color/white"
+        app:fabSize="mini"
+        app:layout_constraintTop_toTopOf="@id/map_view"
+        app:layout_constraintEnd_toEndOf="@id/map_view" />
+
     <!--
         Stats panel fills everything below the map down to the bottom.
     -->

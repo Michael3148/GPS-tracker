@@ -29,11 +29,14 @@ import androidx.core.view.WindowInsetsCompat;
 import com.example.gpstracker.model.TrackPoint;
 import com.example.gpstracker.service.LocationTrackingService;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import org.osmdroid.config.Configuration;
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
+import org.osmdroid.tileprovider.tilesource.XYTileSource;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.MapView;
+import org.osmdroid.views.overlay.CopyrightOverlay;
 import org.osmdroid.views.overlay.Marker;
 import org.osmdroid.views.overlay.Polyline;
 
@@ -167,8 +170,8 @@ public class MainActivity extends AppCompatActivity {
         // prior written permission — that's the exact policy that produced
         // the "Access blocked" tiles you saw. Stadia Maps' free tier is
         // built for real distributed apps like this one, no policy conflict.
-        org.osmdroid.tileprovider.tilesource.XYTileSource stadiaSource =
-                new org.osmdroid.tileprovider.tilesource.XYTileSource(
+        XYTileSource stadiaSource =
+                new XYTileSource(
                         "StadiaAlidadeSmooth",
                         0, 20, 256,
                         ".png?api_key=" + STADIA_MAPS_API_KEY,
@@ -178,8 +181,8 @@ public class MainActivity extends AppCompatActivity {
 
         // Required by both Stadia Maps' and OpenStreetMap's terms: visible
         // attribution on-screen whenever their tiles are displayed.
-        org.osmdroid.views.overlay.CopyrightOverlay copyrightOverlay =
-                new org.osmdroid.views.overlay.CopyrightOverlay(this);
+        CopyrightOverlay copyrightOverlay =
+                new CopyrightOverlay(this);
         copyrightOverlay.setCopyrightNotice("© Stadia Maps, © OpenMapTiles © OpenStreetMap contributors");
         mapView.getOverlays().add(copyrightOverlay);
 
@@ -195,6 +198,17 @@ public class MainActivity extends AppCompatActivity {
         currentLocationMarker = new Marker(mapView);
         currentLocationMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER);
         mapView.getOverlays().add(currentLocationMarker);
+
+        FloatingActionButton fabCurrentLocation = findViewById(R.id.fab_current_location);
+        fabCurrentLocation.setOnClickListener(v -> {
+            TrackPoint point = TrackingRepository.getInstance().latestPoint.getValue();
+            if (point != null) {
+                GeoPoint geoPoint = new GeoPoint(point.latitude, point.longitude);
+                mapView.getController().animateTo(geoPoint);
+            } else {
+                Toast.makeText(this, "Current location not available yet", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void setupStatViews() {
@@ -247,9 +261,8 @@ public class MainActivity extends AppCompatActivity {
         currentPoints.add(geoPoint);
         routeLine.setPoints(currentPoints);
 
-        // Move the "you are here" marker and recenter the camera
+        // Move the "you are here" marker
         currentLocationMarker.setPosition(geoPoint);
-        mapView.getController().animateTo(geoPoint);
 
         // Speed comes straight from the GPS fix, convert m/s -> km/h
         float speedKmh = point.speedMetersPerSecond * 3.6f;
