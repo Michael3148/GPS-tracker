@@ -58,13 +58,13 @@ public class MainActivity extends AppCompatActivity {
     private TextView valueSpeed;
 
     private boolean isTracking = false;
+    private boolean hasCenteredInitialLocation = false;
     private long sessionStartTimeMillis = 0L;
     private final Handler timerHandler = new Handler(Looper.getMainLooper());
 
-    // Ticks once a second while tracking is active, purely to update the
-    // elapsed-time TextView. Deliberately independent of GPS fix arrival —
-    // fixes can be seconds apart or batched, but the clock should still
-    // move smoothly.
+    /* TODO :The below code works on the timer on the acitity ,
+        and responsible for displaying the time elapsed in the screen */
+
     private final Runnable timerRunnable = new Runnable() {
         @Override
         public void run() {
@@ -74,56 +74,43 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    // ===== Permission launchers =====
-    // These MUST be registered unconditionally in onCreate (not inside a
-    // click handler) — ActivityResultLauncher requires registration before
-    // STARTED state or it throws at runtime. Each callback re-invokes
-    // attemptStartTracking(), which simply re-checks what's still missing
-    // and asks for the next thing, or starts the service once nothing's
-    // left to ask for.
 
+    // TODO: foregroundlocationlauncher is used to ask for GPS location permission
     private final ActivityResultLauncher<String[]> foregroundLocationLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), result -> {
                 boolean fineGranted = Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_FINE_LOCATION));
                 boolean coarseGranted = Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_COARSE_LOCATION));
-                if (fineGranted || coarseGranted) {
+
+                if (fineGranted || coarseGranted) { // If either one is granted, start tracking...
                     attemptStartTracking();
                 } else {
                     Toast.makeText(this, "Location permission is required to track your route", Toast.LENGTH_LONG).show();
                 }
             });
 
+    // TODO: backgroundlocationlauncher is used to ask for "Allow all the time" request in the phone
     private final ActivityResultLauncher<String> backgroundLocationLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
                 if (!granted) {
-                    // Not fatal — tracking still works while the app is in
-                    // the foreground, it just won't survive backgrounding.
-                    // Worth telling the user explicitly rather than silently
-                    // degrading, since that's a confusing failure to debug
-                    // for a hiking app.
                     Toast.makeText(this,
                             "Without \"Allow all the time\", tracking will stop when you leave the app",
                             Toast.LENGTH_LONG).show();
                 }
                 attemptStartTracking();
             });
-
+    //TODO: Used for asking a permission to show notification
     private final ActivityResultLauncher<String> notificationPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> attemptStartTracking());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // osmdroid MUST be configured before its views inflate, so this has
-        // to run before setContentView(). We use a plain SharedPreferences
-        // file rather than pulling in the androidx.preference library just
-        // for this one call — Configuration.load() only needs something
-        // that implements the SharedPreferences interface.
         Context ctx = getApplicationContext();
-        SharedPreferences prefs = ctx.getSharedPreferences(ctx.getPackageName() + "_osmdroid", MODE_PRIVATE);
+        SharedPreferences prefs =
+                ctx.getSharedPreferences(
+                ctx.getPackageName() + "_osmdroid",
+                MODE_PRIVATE); //TODO: This totally says "Give me SharedPreference storage named com.example.gpstracker_osmdroid
+
         Configuration.getInstance().load(ctx, prefs);
-        // REQUIRED: OpenStreetMap's tile servers reject requests with a
-        // missing/default user-agent to deter abuse. This single line is
-        // exactly what was missing before, causing the gray checkerboard.
         Configuration.getInstance().setUserAgentValue(getPackageName());
 
         super.onCreate(savedInstanceState);
@@ -154,22 +141,16 @@ public class MainActivity extends AppCompatActivity {
 
         setupMap();
         setupStatViews();
-        observeTrackingRepository();
+        observeTrackingRepository();   //TODO: Usually a good practice to make functions like this instead of coding all of them inside "onCreate"
     }
 
-    // Get a free API key (no credit card needed): stadiamaps.com/signup
-    // Free tier: 200,000 tile requests/month, personal/non-commercial use.
+    // TODO: This is the osmdroid API key my app used , and it is also free
     private static final String STADIA_MAPS_API_KEY = "b635fde5-a56a-4dd8-8aa2-0d8f8b54282f";
 
     private void setupMap() {
         mapView = findViewById(R.id.map_view);
 
-        // REPLACED TileSourceFactory.MAPNIK: that source points at
-        // tile.openstreetmap.org, OSM's own donated infrastructure, which
-        // explicitly forbids "distributing an app" that uses it without
-        // prior written permission — that's the exact policy that produced
-        // the "Access blocked" tiles you saw. Stadia Maps' free tier is
-        // built for real distributed apps like this one, no policy conflict.
+
         XYTileSource stadiaSource =
                 new XYTileSource(
                         "StadiaAlidadeSmooth",
@@ -179,8 +160,7 @@ public class MainActivity extends AppCompatActivity {
                 );
         mapView.setTileSource(stadiaSource);
 
-        // Required by both Stadia Maps' and OpenStreetMap's terms: visible
-        // attribution on-screen whenever their tiles are displayed.
+
         CopyrightOverlay copyrightOverlay =
                 new CopyrightOverlay(this);
         copyrightOverlay.setCopyrightNotice("© Stadia Maps, © OpenMapTiles © OpenStreetMap contributors");
@@ -188,8 +168,6 @@ public class MainActivity extends AppCompatActivity {
 
         mapView.setMultiTouchControls(true);
         mapView.getController().setZoom(17.0);
-        // Reasonable default center (adjust freely) until the first real
-        // GPS fix arrives and we recenter automatically.
         mapView.getController().setCenter(new GeoPoint(9.03, 38.74)); // placeholder center
 
         routeLine = new Polyline();
@@ -211,7 +189,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void setupStatViews() {
+    private void setupStatViews() { //TODO: This method is used to connect my java code to the UI
         valueDistance = findViewById(R.id.valueDistance);
         valueTime = findViewById(R.id.valueTime);
         valueSpeed = findViewById(R.id.valueSpeed);
@@ -244,6 +222,7 @@ public class MainActivity extends AppCompatActivity {
                 timerHandler.post(timerRunnable);
             } else {
                 timerHandler.removeCallbacks(timerRunnable);
+                hasCenteredInitialLocation = false;
             }
         });
     }
@@ -251,20 +230,24 @@ public class MainActivity extends AppCompatActivity {
     private void onNewPoint(TrackPoint point) {
         if (point == null) {
             routeLine.setPoints(new ArrayList<>());
+            hasCenteredInitialLocation = false;
             return;
         }
 
         GeoPoint geoPoint = new GeoPoint(point.latitude, point.longitude);
 
-        // Extend the drawn route
+        // Center map camera once when the first fix arrives
+        if (!hasCenteredInitialLocation) {
+            mapView.getController().animateTo(geoPoint);
+            hasCenteredInitialLocation = true;
+        }
+
         List<GeoPoint> currentPoints = new ArrayList<>(routeLine.getPoints());
         currentPoints.add(geoPoint);
         routeLine.setPoints(currentPoints);
 
-        // Move the "you are here" marker
         currentLocationMarker.setPosition(geoPoint);
 
-        // Speed comes straight from the GPS fix, convert m/s -> km/h
         float speedKmh = point.speedMetersPerSecond * 3.6f;
         valueSpeed.setText(String.format(Locale.getDefault(), "%.1f km/h", speedKmh));
 
@@ -283,12 +266,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * Walks through the permission chain one missing piece at a time.
-     * Safe to call repeatedly — each check is a no-op if already granted,
-     * so calling this again after any single permission result naturally
-     * advances to the next requirement or starts the service.
-     */
+
     private void attemptStartTracking() {
         if (!hasForegroundLocationPermission()) {
             foregroundLocationLauncher.launch(new String[]{
@@ -298,9 +276,6 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // Background location is API 29+ only, and MUST be requested in a
-        // separate call from fine/coarse — bundling them on API 30+ causes
-        // the system to silently limit the grant to foreground-only.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !hasBackgroundLocationPermission()) {
             backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION);
             return;
@@ -356,9 +331,7 @@ public class MainActivity extends AppCompatActivity {
         return String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds);
     }
 
-    // osmdroid explicitly requires these lifecycle calls to manage its tile
-    // cache and sensor overlays correctly — skipping them causes memory
-    // leaks and occasional crashes on resume.
+
     @Override
     protected void onResume() {
         super.onResume();
