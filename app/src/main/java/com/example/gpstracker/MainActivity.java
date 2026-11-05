@@ -144,14 +144,14 @@ public class MainActivity extends AppCompatActivity {
         observeTrackingRepository();   //TODO: Usually a good practice to make functions like this instead of coding all of them inside "onCreate"
     }
 
-    // TODO: This is the osmdroid API key my app used , and it is also free
+    // TODO: This is the Stadia's  key my app used , and it is also free
     private static final String STADIA_MAPS_API_KEY = "b635fde5-a56a-4dd8-8aa2-0d8f8b54282f";
 
-    private void setupMap() {
+    private void setupMap() { //TODO : It prepares the map, the button , the pin , the line (Without this function , the app loads but with no map and dead buttons)
         mapView = findViewById(R.id.map_view);
 
 
-        XYTileSource stadiaSource =
+        XYTileSource stadiaSource = //TODO: This tells the app “get them from Stadia’s servers. (This is the part that fixed your gray “Access blocked” squares.)
                 new XYTileSource(
                         "StadiaAlidadeSmooth",
                         0, 20, 256,
@@ -175,7 +175,7 @@ public class MainActivity extends AppCompatActivity {
 
         currentLocationMarker = new Marker(mapView);
         currentLocationMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER);
-        mapView.getOverlays().add(currentLocationMarker);
+        mapView.getOverlays().add(currentLocationMarker); //TODO: currentLocationMarker is who draws the pathline in the map
 
         FloatingActionButton fabCurrentLocation = findViewById(R.id.fab_current_location);
         fabCurrentLocation.setOnClickListener(v -> {
@@ -186,10 +186,10 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 Toast.makeText(this, "Current location not available yet", Toast.LENGTH_SHORT).show();
             }
-        });
+        });//TODO: This minifunction tells the map "If you know this way draw a line if not not available yet"
     }
 
-    private void setupStatViews() { //TODO: This method is used to connect my java code to the UI
+    private void setupStatViews() { //TODO: This method is used to connect my java code to the UI (Stop and Start Tracking button)
         valueDistance = findViewById(R.id.valueDistance);
         valueTime = findViewById(R.id.valueTime);
         valueSpeed = findViewById(R.id.valueSpeed);
