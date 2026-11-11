@@ -24,7 +24,7 @@ import com.example.gpstracker.model.TrackPoint;
  * doing before you rely on this for real multi-hour hikes, flagged here so
  * it doesn't surprise you later.
  */
-public class TrackingRepository {
+public class TrackingRepository { //Todo : The bridge between MainActivity and LocationTrackingService (Live data sharing)
 
     private static TrackingRepository instance;
 
@@ -34,22 +34,22 @@ public class TrackingRepository {
 
     private TrackPoint previousPoint;
 
-    private TrackingRepository() {
+    private TrackingRepository() { // TODO : Private makes this class the only copy in the entire app
     }
 
-    public static synchronized TrackingRepository getInstance() {
+    public static synchronized TrackingRepository getInstance() { // TODO : synchronized (makes sures two threads can't create 2 copies at the same time)
         if (instance == null) {
             instance = new TrackingRepository();
         }
         return instance;
-    }
+    } // TODO : Because activity and service must see the same data !!
 
     /** Called by LocationTrackingService every time a new fix arrives. */
-    public void addPoint(TrackPoint point) {
-        latestPoint.postValue(point);
+    public void addPoint(TrackPoint point) { // TODO : Accept points every time the GPS gives me new point
+        latestPoint.postValue(point); // TODO : Hands the new arrived GPS point to MainActivity which runs on onNewPoint()
 
-        if (previousPoint != null) {
-            float[] results = new float[1];
+        if (previousPoint != null) { // TODO : Measures if there is a previous point arrived before A , if yes calculate a path between A and B
+            float[] results = new float[1]; //TODO : This is androids built in GPS calculator
             Location.distanceBetween(
                     previousPoint.latitude, previousPoint.longitude,
                     point.latitude, point.longitude,
@@ -58,16 +58,16 @@ public class TrackingRepository {
             // Ignore sub-meter jumps — raw GPS jitter while standing still
             // otherwise silently inflates the distance total over a long
             // session, which is a very common bug in tutorial trackers.
-            if (results[0] > 1.0f) {
+            if (results[0] > 1.0f) { // TODO : This is used to ignore tiny movments in meters
                 double current = totalDistanceMeters.getValue() == null ? 0 : totalDistanceMeters.getValue();
                 totalDistanceMeters.postValue(current + results[0]);
             }
         }
-        previousPoint = point;
+        previousPoint = point; // TODO : After finishing , the new point becomes previous one and wait for another
     }
 
     /** Called when starting a fresh tracking session. */
-    public void reset() {
+    public void reset() { // TODO : Forget the previous point and prepare a new map
         previousPoint = null;
         totalDistanceMeters.postValue(0.0);
         latestPoint.postValue(null);

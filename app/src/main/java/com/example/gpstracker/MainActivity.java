@@ -151,7 +151,7 @@ public class MainActivity extends AppCompatActivity {
         mapView = findViewById(R.id.map_view);
 
 
-        XYTileSource stadiaSource = //TODO: This tells the app “get them from Stadia’s servers. (This is the part that fixed your gray “Access blocked” squares.)
+        XYTileSource stadiaSource = //TODO: This tells the app “get them from Stadia’s servers. (This is the part that fixed your gray “Access blocked” squares by fetching real map.)
                 new XYTileSource(
                         "StadiaAlidadeSmooth",
                         0, 20, 256,
@@ -186,7 +186,7 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 Toast.makeText(this, "Current location not available yet", Toast.LENGTH_SHORT).show();
             }
-        });//TODO: This minifunction tells the map "If you know this way draw a line if not not available yet"
+        });//TODO: This mini function tells the map "If you know this way draw a line if not not available yet"
     }
 
     private void setupStatViews() { //TODO: This method is used to connect my java code to the UI (Stop and Start Tracking button)
@@ -205,16 +205,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void observeTrackingRepository() {
-        TrackingRepository repo = TrackingRepository.getInstance();
+        TrackingRepository repo = TrackingRepository.getInstance(); //TODO : Used to fetch the data from the TrackingRepository class
 
         repo.latestPoint.observe(this, this::onNewPoint);
 
-        repo.totalDistanceMeters.observe(this, meters -> {
+        repo.totalDistanceMeters.observe(this, meters -> { //TODO : It converts meter into KM and displays it on the screen
             double km = (meters == null ? 0 : meters) / 1000.0;
             valueDistance.setText(String.format(Locale.getDefault(), "%.2f km", km));
         });
 
-        repo.isTracking.observe(this, tracking -> {
+        repo.isTracking.observe(this, tracking -> { //TODO : It reacts to tracking state flipping between true and false (TRACKING & START tracking)
             isTracking = Boolean.TRUE.equals(tracking);
             updateButtonAppearance();
             if (isTracking) {
@@ -227,8 +227,8 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void onNewPoint(TrackPoint point) {
-        if (point == null) {
+    private void onNewPoint(TrackPoint point) { //TODO : It decides what the line contains (Observe latestPoint so it runs once per new point)
+        if (point == null) { // TODO : This if statement erases everything when a new tracking session starts
             routeLine.setPoints(new ArrayList<>());
             hasCenteredInitialLocation = false;
             return;
@@ -236,25 +236,25 @@ public class MainActivity extends AppCompatActivity {
 
         GeoPoint geoPoint = new GeoPoint(point.latitude, point.longitude);
 
-        // Center map camera once when the first fix arrives
-        if (!hasCenteredInitialLocation) {
+
+        if (!hasCenteredInitialLocation) { // TODO : Prevent the application form Re-centering every time
             mapView.getController().animateTo(geoPoint);
             hasCenteredInitialLocation = true;
         }
 
-        List<GeoPoint> currentPoints = new ArrayList<>(routeLine.getPoints());
+        List<GeoPoint> currentPoints = new ArrayList<>(routeLine.getPoints()); // Review this line of code again !!!!!!!!!!!!!
         currentPoints.add(geoPoint);
         routeLine.setPoints(currentPoints);
 
-        currentLocationMarker.setPosition(geoPoint);
+        currentLocationMarker.setPosition(geoPoint); //TODO : The dots jump into the newest location
 
-        float speedKmh = point.speedMetersPerSecond * 3.6f;
+        float speedKmh = point.speedMetersPerSecond * 3.6f; //TODO : The GPS speed comes by M so this line converts into KM
         valueSpeed.setText(String.format(Locale.getDefault(), "%.1f km/h", speedKmh));
 
         mapView.invalidate();
     }
 
-    private void updateButtonAppearance() {
+    private void updateButtonAppearance() { //TODO : Holds the button's texts that change between TRACKING... & START TRACKING
         if (isTracking) {
             buttonStartStop.setText("TRACKING . . .");
             buttonStartStop.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(this, R.color.red)));
@@ -267,21 +267,21 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private void attemptStartTracking() {
-        if (!hasForegroundLocationPermission()) {
-            foregroundLocationLauncher.launch(new String[]{
+    private void attemptStartTracking() { // TODO : This function checks for Granted and Denied permissions (Checks weather the app is allowed to start or not)
+        if (!hasForegroundLocationPermission()) { // TODO : It checks weather the user give FINE OR COARE location permission to the app
+            foregroundLocationLauncher.launch(new String[]{ // TODO : Responsible for “Allow GPS tracker to access this device’s location?” permission to popup
                     Manifest.permission.ACCESS_FINE_LOCATION,
                     Manifest.permission.ACCESS_COARSE_LOCATION
             });
             return;
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !hasBackgroundLocationPermission()) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !hasBackgroundLocationPermission()) { // TODO : Helps the application to work on the screen off
             backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION);
             return;
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission()) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission()) { // TODO : Responsible for the red LIVE TRACKING NOTIFICATION permission
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
             return;
         }
@@ -289,20 +289,20 @@ public class MainActivity extends AppCompatActivity {
         startTrackingService();
     }
 
-    private boolean hasForegroundLocationPermission() {
+    private boolean hasForegroundLocationPermission() { // TODO : Checks whether FINE or COARSE location is granted
         return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED
                 || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED;
     }
 
-    private boolean hasBackgroundLocationPermission() {
+    private boolean hasBackgroundLocationPermission() { // TODO : Checks if "Allow all the time" has been granted (For Android 9 and below , its counts as already granted)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true;
         return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
                 == PackageManager.PERMISSION_GRANTED;
     }
 
-    private boolean hasNotificationPermission() {
+    private boolean hasNotificationPermission() { // TODO : Checks whether LIVE TRACKING notification has access denied or accepted
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true;
         return ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 == PackageManager.PERMISSION_GRANTED;
@@ -333,13 +333,13 @@ public class MainActivity extends AppCompatActivity {
 
 
     @Override
-    protected void onResume() {
+    protected void onResume() { // TODO : Actions when the screen comes form the Foreground (first open , comeback again)
         super.onResume();
         if (mapView != null) mapView.onResume();
     }
 
     @Override
-    protected void onPause() {
+    protected void onPause() { // Todo: Action when the application is not on the screen ( Screen locked , another app on the top)
         super.onPause();
         if (mapView != null) mapView.onPause();
     }
