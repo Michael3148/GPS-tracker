@@ -85,12 +85,12 @@ public class LocationTrackingService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this); // TODO : gets your connection to Google’s location system. It doesn’t start tracking, it only picks up the tool.
         createNotificationChannel();
     }
 
     @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
+    public int onStartCommand(Intent intent, int flags, int startId) { // TODO: It is a command reciver for your service (Weather start tracking , notification stop ... any command )
         String action = intent != null ? intent.getAction() : null;
 
         if (ACTION_STOP.equals(action)) {
@@ -116,8 +116,7 @@ public class LocationTrackingService extends Service {
     }
 
     private void startLocationUpdates() {
-        if (locationCallback != null) {
-            // already running, avoid double-registering
+        if (locationCallback != null) { // TODO : If callback already exist , Don't register twice
             return;
         }
 
@@ -133,19 +132,19 @@ public class LocationTrackingService extends Service {
             return;
         }
 
-        LocationRequest locationRequest =
-                new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, UPDATE_INTERVAL_MS)
-                        .setMinUpdateIntervalMillis(MIN_UPDATE_INTERVAL_MS)
+        LocationRequest locationRequest = // TODO : This is the heart of target 2
+                new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, UPDATE_INTERVAL_MS)  // TODO : PRIORITY_HIGH_ACCURACY means Most accurate , Most battery & UPDATE_INTERVAL_MS means ask a location every 5s average
+                        .setMinUpdateIntervalMillis(MIN_UPDATE_INTERVAL_MS) // TODO : 3s , Never faster than this
                         // setMaxUpdateDelayMillis enables "batching": the GPS chip
                         // can buffer several fixes in hardware and deliver them in
                         // one burst instead of waking the main CPU for every single
                         // fix. This is one of the single biggest battery wins
                         // available and is almost never mentioned in tutorials.
-                        .setMaxUpdateDelayMillis(MAX_UPDATE_DELAY_MS)
+                        .setMaxUpdateDelayMillis(MAX_UPDATE_DELAY_MS) // TODO : 15s , is the maximum delay
                         .setWaitForAccurateLocation(false)
                         .build();
 
-        locationCallback = new LocationCallback() {
+        locationCallback = new LocationCallback() { // TODO : This is what you do when a package arrives: open it, take what’s inside, and put it where it belongs. Also doesn't run right now
             @Override
             public void onLocationResult(LocationResult result) {
                 if (result == null) return;
@@ -176,17 +175,17 @@ public class LocationTrackingService extends Service {
             }
         };
 
-        fusedLocationClient.requestLocationUpdates(
-                locationRequest,
-                locationCallback,
-                getMainLooper()
+        fusedLocationClient.requestLocationUpdates( // TODO : Gets the GPS data and calls you back
+                locationRequest, // TODO : How you want locations (Every 5s , high accuracy , batching)
+                locationCallback,// TODO : What to do when each delivery arrives
+                getMainLooper() // TODO : Run my call backs in the main threads
         );
     }
 
-    private void acquireShortWakeLock() {
+    private void acquireShortWakeLock() { // TODO : When the screen goes off , also the CPU tries to sleep . This function prevents the CPU form sleeping
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
         if (pm == null) return;
-        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GpsTracker:pointWriteLock");
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GpsTracker:pointWriteLock"); // TODO : Keeps only the CPU not the screen
         wakeLock.acquire(10_000L); // safety timeout so a bug can never hold it forever
     }
 
@@ -196,7 +195,7 @@ public class LocationTrackingService extends Service {
         }
     }
 
-    private void stopTracking() {
+    private void stopTracking() { // TODO : This function is the shutdown sequence
         if (fusedLocationClient != null && locationCallback != null) {
             fusedLocationClient.removeLocationUpdates(locationCallback);
         }
@@ -217,24 +216,24 @@ public class LocationTrackingService extends Service {
      * the real fix; this is a safety net underneath it.
      */
     @Override
-    public void onTaskRemoved(Intent rootIntent) {
+    public void onTaskRemoved(Intent rootIntent) { // TODO: It is a swipe-away handler , Functions when the user swipes out the application from the screen
         super.onTaskRemoved(rootIntent);
 
-        if (locationCallback == null) {
-            // We weren't actively tracking, nothing to rescue.
+        if (locationCallback == null) { // TODO : Checks weather we were actually tracking while the swipe happens.
             return;
         }
 
-        Intent restartIntent = new Intent(getApplicationContext(), LocationTrackingService.class);
+        Intent restartIntent = new Intent(getApplicationContext(), LocationTrackingService.class);  // TODO : These two lines create the “start tracking” message and holds it (it doesn't pass any where).
         restartIntent.setAction(ACTION_START);
-        PendingIntent pendingIntent = PendingIntent.getService(
-                getApplicationContext(),
+
+        PendingIntent pendingIntent = PendingIntent.getService(  //TODO : Is an intent passed to AlarmManager so it can fire it later even if the application is dead
+                getApplicationContext(), // PendingIntent wraps an intent so another application can use it later (Not imediate like Intent) , But you have to declare normal intent in order to use pendingIntent
                 1,
                 restartIntent,
                 PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE
         );
 
-        AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE); // TODO : After 2 seconds lunch the pendingIntent and start the service again
         if (alarmManager != null) {
             alarmManager.set(
                     AlarmManager.ELAPSED_REALTIME_WAKEUP,
@@ -244,8 +243,8 @@ public class LocationTrackingService extends Service {
         }
     }
 
-    private void createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+    private void createNotificationChannel() { // TODO : This function is responsible for creating the notification bar
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { // TODO : Checks the phone is new enough to handle the notification
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
                     "Location tracking",
@@ -253,13 +252,13 @@ public class LocationTrackingService extends Service {
             );
             channel.setDescription("Shows when your route is being recorded");
             NotificationManager manager = getSystemService(NotificationManager.class);
-            if (manager != null) {
+            if (manager != null) { // TODO : Checks if android gives me the notification manager
                 manager.createNotificationChannel(channel);
             }
         }
     }
 
-    private Notification buildNotification() {
+    private Notification buildNotification() { // TODO : Makes the sticky note that proves tracking is running, with a Stop button the phone’s notification bar can press on my behalf.
         Intent stopIntent = new Intent(this, LocationTrackingService.class);
         stopIntent.setAction(ACTION_STOP);
         PendingIntent stopPendingIntent = PendingIntent.getService(

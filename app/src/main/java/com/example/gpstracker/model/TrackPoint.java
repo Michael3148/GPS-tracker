@@ -1,6 +1,6 @@
 package com.example.gpstracker.model;
 
-public class TrackPoint {
+public class TrackPoint { //TODO : This class only stores values and pass it to who whoever class it asks
 
     public final double latitude;
     public final double longitude;
