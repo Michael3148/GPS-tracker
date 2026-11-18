@@ -103,7 +103,7 @@ public class MainActivity extends AppCompatActivity {
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> attemptStartTracking());
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState) { // TODO : MainActivity mainly function is to listen to the bridge (TrackRepository) and draws path on your map 
         Context ctx = getApplicationContext();
         SharedPreferences prefs =
                 ctx.getSharedPreferences(

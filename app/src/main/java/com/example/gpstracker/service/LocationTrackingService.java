@@ -59,7 +59,7 @@ import java.util.List;
  *      control. No code-only trick reliably solves this — it requires the
  *      user to allow-list the app, which is Layer 3 (a later message).
  */
-public class LocationTrackingService extends Service {
+public class LocationTrackingService extends Service { // TODO : LocationTrackingRepository collects the GPS points in the back ground and pass it to MainActivity using TrackingRepository.
 
     private static final String TAG = "LocationTrackingSvc";
 
