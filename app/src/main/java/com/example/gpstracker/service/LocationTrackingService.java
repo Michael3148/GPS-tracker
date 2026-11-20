@@ -103,15 +103,21 @@ public class LocationTrackingService extends Service { // TODO : LocationTrackin
         // starting on API 26+, so we do it unconditionally here before any
         // other setup work, even if location updates fail to register.
         startForeground(NOTIFICATION_ID, buildNotification());
-        TrackingRepository.getInstance().reset();
+
+        // Already tracking? Ignore the repeated command. Never wipe a live session.
+        if (locationCallback != null) {
+            return START_STICKY;
+        }
+
+        // A real START from the button carries an intent = new trip, so reset.
+        // A null intent means Android recreated us after a kill = keep the numbers.
+        if (intent != null) {
+            TrackingRepository.getInstance().reset();
+        }
+
         TrackingRepository.getInstance().isTracking.postValue(true);
         startLocationUpdates();
 
-        // START_STICKY: if the system kills us purely for memory (not an
-        // explicit user swipe-away), recreate the service with a null intent
-        // and let onStartCommand's default branch above restart tracking.
-        // This does NOT protect against onTaskRemoved-triggered kills on
-        // aggressive OEMs — that's handled separately below.
         return START_STICKY;
     }
 
